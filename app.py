@@ -15,20 +15,22 @@ st.set_page_config(page_title="AI Text Detector", page_icon="🔍", layout="wide
 # A plain `pip install` of econ-ai-detector doesn't ship its models/ folder
 # (its pyproject.toml only declares the econ_ai_detector package, dropping
 # the sibling models/ directory from the wheel), so Detector() can't find
-# its weights. Fetch the two small files it needs into the path it expects
-# on first run, so the app works with a normal pip install anywhere
-# (including no-shell-access deploy platforms).
+# its weights. Fetch the two small files it needs into a scratch directory
+# and point the package at that instead of its own install location, which
+# on some hosts (e.g. Streamlit Community Cloud) is read-only at runtime.
 _MODELS_RAW = "https://raw.githubusercontent.com/paulgp/econ-ai-detector/main/models"
 
 
 def _ensure_models():
-    import econ_ai_detector
-    models_dir = Path(econ_ai_detector.__file__).resolve().parent.parent / "models"
+    import econ_ai_detector.detector as detector_mod
+
+    models_dir = Path(tempfile.gettempdir()) / "econ_ai_detector_models"
     models_dir.mkdir(parents=True, exist_ok=True)
     for fname in ("lr_v3.joblib", "thresholds.json"):
         dest = models_dir / fname
         if not dest.exists():
             urllib.request.urlretrieve(f"{_MODELS_RAW}/{fname}", dest)
+    detector_mod.MODELS = models_dir
 
 
 def k2(values):
