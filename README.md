@@ -12,21 +12,35 @@ live there.
 ./setup.sh
 ```
 
-This creates a venv, installs the app's own deps, then clones
-`paulgp/econ-ai-detector` into `vendor/` and installs it **in editable
-mode**. That's a deliberate workaround, not the documented install: a plain
-`pip install git+https://github.com/paulgp/econ-ai-detector` currently
-crashes on first use, because its `pyproject.toml` only declares the
-`econ_ai_detector` Python package and drops the sibling `models/` directory
-(the LR weights + thresholds) from the installed wheel — `Detector()` then
-can't find `models/lr_v3.joblib`. An editable install keeps the package
-pointed at the cloned source tree, where `models/` is still sitting next to
-it, so it works. If upstream fixes their packaging, this can go back to a
-normal `pip install` line in `requirements.txt`.
+This creates a venv and installs everything, including
+`paulgp/econ-ai-detector` and its own dependencies (torch, transformers,
+scikit-learn, pymupdf, ...) — the first run can take a few minutes and a
+couple GB of disk.
 
-Installing pulls in the detector's own dependencies (torch, transformers,
-scikit-learn, pymupdf, ...), so the first run of `setup.sh` can take a few
-minutes and a couple GB of disk.
+Note: `paulgp/econ-ai-detector`'s `pyproject.toml` only declares the
+`econ_ai_detector` Python package, so a plain `pip install` drops the
+sibling `models/` directory (its LR weights + thresholds) from the wheel,
+and `Detector()` can't find them. `app.py`'s `_ensure_models()` works
+around this by downloading those two small files straight from the
+upstream repo into the path the package expects, the first time the app
+runs. No editable install or manual clone needed.
+
+## Deploy without a terminal
+
+No local install needed — deploy straight from GitHub in a browser:
+
+1. Go to [huggingface.co/new-space](https://huggingface.co/new-space), sign
+   in (free), pick a name, choose **Streamlit** as the SDK.
+2. In the new Space's **Files** tab, add this repo's `app.py` and
+   `requirements.txt` (either upload them, or link the Space to this GitHub
+   repo under Settings → Repository).
+3. The Space builds and starts automatically; open the Space's URL in any
+   browser.
+
+[Hugging Face Spaces](https://huggingface.co/spaces) free tier gives more
+RAM than Streamlit Community Cloud, which matters here since the
+neural-network scorer loads a ~330MB model. If it's tight, uncheck "Run
+the neural-network scorer" in the sidebar for a lighter LR-only mode.
 
 ## Run
 

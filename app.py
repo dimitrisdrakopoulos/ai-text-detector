@@ -4,12 +4,31 @@ texts (.txt/.pdf) and score each for AI-generated prose.
 Run with: streamlit run app.py
 """
 import tempfile
+import urllib.request
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="AI Text Detector", page_icon="🔍", layout="wide")
+
+# A plain `pip install` of econ-ai-detector doesn't ship its models/ folder
+# (its pyproject.toml only declares the econ_ai_detector package, dropping
+# the sibling models/ directory from the wheel), so Detector() can't find
+# its weights. Fetch the two small files it needs into the path it expects
+# on first run, so the app works with a normal pip install anywhere
+# (including no-shell-access deploy platforms).
+_MODELS_RAW = "https://raw.githubusercontent.com/paulgp/econ-ai-detector/main/models"
+
+
+def _ensure_models():
+    import econ_ai_detector
+    models_dir = Path(econ_ai_detector.__file__).resolve().parent.parent / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    for fname in ("lr_v3.joblib", "thresholds.json"):
+        dest = models_dir / fname
+        if not dest.exists():
+            urllib.request.urlretrieve(f"{_MODELS_RAW}/{fname}", dest)
 
 
 def k2(values):
@@ -20,6 +39,7 @@ def k2(values):
 
 @st.cache_resource(show_spinner=False)
 def load_detector(target_fpr: str):
+    _ensure_models()
     from econ_ai_detector import Detector
     return Detector(target_fpr=target_fpr)
 
