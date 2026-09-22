@@ -55,30 +55,39 @@ def score_item(det, name: str, text: str = None, pdf_path: str = None,
     wins = windows(raw)
     kept = [w for w in wins if prose_ok(w)] if gate else wins
 
+    too_short = len(kept) < 2
+    short_note = (
+        f"only {len(kept)} scored window(s) (~{len(kept) * 250} words or less kept after "
+        "gating) — the flag rule needs at least 2 to compute its 2nd-highest-window score, "
+        "so this result will look the same for any short text regardless of content"
+    ) if too_short else ""
+
     lr = det.lr_scores(kept)
     lr_k2 = k2(lr)
     row = {
         "name": name, "n_windows": len(wins), "n_scored": len(kept),
-        "lr_k2": lr_k2, "lr_threshold": det.thr["lr_k2_min"],
-        "nn_k2": None, "nn_threshold": None, "flagged": None, "note": "",
+        "lr_k2": None if too_short else lr_k2, "lr_threshold": det.thr["lr_k2_min"],
+        "nn_k2": None, "nn_threshold": None, "flagged": None, "note": short_note,
     }
 
     if not use_nn:
-        row["note"] = "LR-only: no official flagged/not-flagged verdict (needs NN too)"
+        row["note"] = (short_note + "; " if short_note else "") + \
+            "LR-only: no official flagged/not-flagged verdict (needs NN too)"
         return row, lr, []
 
     try:
         nn = det.nn_margins(kept)
     except Exception as e:  # e.g. no network to fetch the HF weights
-        row["note"] = f"NN scorer unavailable ({e}); showing LR-only signal"
+        row["note"] = (short_note + "; " if short_note else "") + \
+            f"NN scorer unavailable ({e}); showing LR-only signal"
         return row, lr, []
 
     nn_k2 = k2(nn)
-    row["nn_k2"] = nn_k2
+    row["nn_k2"] = None if too_short else nn_k2
     row["nn_threshold"] = det.thr["nn_margin_k2_min"]
-    row["flagged"] = bool(lr_k2 >= det.thr["lr_k2_min"] and nn_k2 >= det.thr["nn_margin_k2_min"])
-    if len(kept) < 2:
-        row["note"] = "fewer than 2 scored windows: the flag rule can't trigger reliably"
+    row["flagged"] = None if too_short else bool(
+        lr_k2 >= det.thr["lr_k2_min"] and nn_k2 >= det.thr["nn_margin_k2_min"]
+    )
     return row, lr, nn
 
 
